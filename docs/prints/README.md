@@ -1,12 +1,21 @@
-# Prints / Evidencias
+# Prints / Evidencias (entrega)
 
-Capturas de tela da execucao do projeto:
+Coloque nesta pasta as **imagens** referenciadas no `README.md` e no PDF
+(`docs/ENTREGA.pdf`). Nomes sugeridos (ajuste se o enunciado pedir outros):
 
-- `docker-containers.png` - `docker compose ps` mostrando os containers
-  `skyrescue-app` e `skyrescue-postgres` com status `healthy`.
-- `swagger1.png`, `swagger2.png`, `swagger3.png` - Swagger UI em
-  `http://localhost:8080/swagger-ui.html` com os endpoints de drones,
-  missoes e vitimas.
-- `github-actions-beginning.png` - pipeline do GitHub Actions iniciando.
-- `github-pipeline.png` - pipeline do GitHub Actions completo (build,
-  testes, docker build, deploy staging e producao).
+| Arquivo sugerido | Conteudo |
+| ---------------- | --------- |
+| `docker-containers.png` | `docker compose ps` com app e Postgres `healthy` |
+| `swagger1.png` | Swagger — recursos de drones |
+| `swagger2.png` | Swagger — missoes |
+| `swagger3.png` | Swagger — vitimas |
+| `github-actions-beginning.png` | Workflow iniciando |
+| `github-pipeline.png` | Workflow completo (build, testes, docker, deploy) |
+| `pipeline-bdd-step.png` | (opcional) passo "Testes BDD" verde na Actions |
+| `staging-health-or-swagger.png` | Evidencia do ambiente de **staging** |
+| `production-health-or-swagger.png` | Evidencia do ambiente de **producao** |
+
+**Opcional:** logs de CI (`.txt`) ou `docker compose logs` exportados.
+
+Se usar apenas links (repositorio publico, Actions, ambiente), inclua-os no
+`README.md` na secao **Prints do funcionamento** e repita no PDF.

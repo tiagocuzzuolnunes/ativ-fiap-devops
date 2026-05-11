@@ -1,29 +1,63 @@
-# Projeto - SkyRescue (Cidades ESG Inteligentes)
+# Projeto - Cidades ESG Inteligentes
+
+**SkyRescue** — API REST para resgate com drones (cadastro de drones, missoes e vitimas).
 
 Sistema de uma startup que opera uma frota de drones autonomos para encontrar
 vitimas em situacoes de desastre (enchentes, terremotos, incendios,
-deslizamentos, desabamentos). A API expoe endpoints para cadastrar drones,
-planejar missoes de resgate e registrar as deteccoes de vitimas feitas em
-tempo real pelos drones.
+deslizamentos, desabamentos). O foco da entrega sao praticas de DevOps: CI/CD,
+containerizacao e orquestracao.
 
-O objetivo da entrega e aplicar praticas de DevOps ao projeto: pipeline de
-CI/CD, containerizacao e orquestracao.
+## Conteudo do ZIP (estrutura minima)
 
+O arquivo `.ZIP` da entrega deve conter o **repositorio completo** (recomenda-se
+`./mvnw clean` antes de compactar para nao enviar a pasta `target/`). Estrutura
+alinhada ao enunciado:
+
+```text
+seu-projeto/
+├── Dockerfile
+├── docker-compose.yml
+├── docker-compose.staging.yml
+├── docker-compose.prod.yml
+├── .dockerignore
+├── .env.example
+├── pom.xml
+├── mvnw
+├── mvnw.cmd
+├── .mvn/
+├── src/
+├── skyrescue-bdd/          # testes BDD (Cucumber), schema JSON e features
+├── docs/
+│   ├── ENTREGA.md          # base para gerar o PDF/PPT
+│   └── prints/             # evidencias (imagens); ver secao "Prints"
+└── .github/
+    └── workflows/
+        └── ci-cd.yml
+```
+
+Inclua tambem: codigo-fonte completo, configuracao de CI/CD, scripts Maven
+Wrapper, `.env.example`, e (opcional) logs ou prints em `docs/prints/`.
 
 ## Como executar localmente com Docker
 
 Pre-requisitos: Docker 24+ e Docker Compose v2.
 
+1. Copie as variaveis de ambiente de exemplo:
+
 ```bash
 cp .env.example .env
+```
+
+2. Suba os containers (build da imagem da aplicacao + Postgres):
+
+```bash
 docker compose up -d --build
 ```
 
-Isso sobe dois containers: a aplicacao Spring Boot na porta `8080` e um
-Postgres 16 na porta `5432`. O primeiro start pode demorar ~1 minuto por
-causa do build da imagem.
+Isso sobe a aplicacao Spring Boot na porta `8080` e o Postgres 16 na porta
+`5432`. O primeiro start pode demorar ~1 minuto por causa do build da imagem.
 
-Para conferir se esta no ar:
+3. Verifique se esta no ar:
 
 ```bash
 docker compose ps
@@ -35,143 +69,62 @@ curl http://localhost:8080/api/v1/drones
 A documentacao dos endpoints (Swagger) fica em
 <http://localhost:8080/swagger-ui.html>.
 
-Para subir com os perfis de staging ou producao:
+**Perfis Compose (staging / producao):**
 
 ```bash
-# staging (app na 8080)
 docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d --build
-
-# producao (app na 80, limites de recurso maiores)
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
-Para parar:
+**Parar:**
 
 ```bash
-docker compose down       # mantem o volume do banco
-docker compose down -v    # remove tambem o volume
+docker compose down
+docker compose down -v
 ```
 
-Quem preferir rodar sem Docker:
+**Sem Docker (desenvolvimento com H2):**
 
 ```bash
-./mvnw spring-boot:run     # perfil dev, H2 em memoria
-./mvnw test                # executa os testes
-```
-
-### Testes BDD (Cucumber) e contrato de Missao
-
-Os cenarios Gherkin, o JSON Schema da resposta de missao e o codigo Java dos steps
-ficam concentrados na pasta **`skyrescue-bdd/`** (features, schema e fontes de
-teste adicionais via Maven).
-
-- **Suite completa (inclui BDD, H2 / perfil `test`):**
-
-```bash
+./mvnw spring-boot:run
 ./mvnw test
 ```
 
-O perfil **`test`** (H2 em memoria, `src/test/resources/application-test.yml`) e aplicado
-automaticamente nos testes Spring que usam `@ActiveProfiles("test")`.
-
-- **Somente BDD + teste de contrato JSON (Cucumber + `MissionResponseContractTest`, H2):**
-
-```bash
-./mvnw test "-Dtest=bdd.skyrescue.SkyRescueBddJUnitSuite,bdd.skyrescue.MissionResponseContractTest"
-```
-
-Os testes BDD usam o tag JUnit `bdd` para serem excluidos do passo principal da CI
-(`-DexcludedGroups=bdd`); o passo dedicado executa explicitamente a suite Cucumber e o
-contrato JSON. O codigo Java dos cenarios fica no pacote **`bdd.skyrescue`** (fora de
-`br.com.fiap.skyrescue` para nao ser registrado como bean na aplicacao principal).
-
-
-## Endpoints principais
-
-| Metodo | Rota                                     | Descricao                         |
-| ------ | ---------------------------------------- | --------------------------------- |
-| GET    | `/api/v1/status`                         | Status e ambiente atual           |
-| GET    | `/actuator/health`                       | Health check                      |
-| GET    | `/actuator/prometheus`                   | Metricas Prometheus               |
-| GET    | `/api/v1/drones`                         | Lista drones                      |
-| POST   | `/api/v1/drones`                         | Cadastra drone                    |
-| PUT    | `/api/v1/drones/{id}`                    | Atualiza drone                    |
-| DELETE | `/api/v1/drones/{id}`                    | Remove drone                      |
-| GET    | `/api/v1/missions`                       | Lista missoes                     |
-| POST   | `/api/v1/missions`                       | Cria missao (com drone opcional)  |
-| PATCH  | `/api/v1/missions/{id}/status?status=..` | Atualiza status da missao         |
-| GET    | `/api/v1/missions/{id}/victims`          | Vitimas detectadas na missao      |
-| POST   | `/api/v1/missions/{id}/victims`          | Registra nova deteccao            |
-
-Exemplo de chamada para cadastrar um drone:
-
-```bash
-curl -X POST http://localhost:8080/api/v1/drones \
-  -H "Content-Type: application/json" \
-  -d '{
-    "serialNumber": "SR-CHARLIE-003",
-    "model": "SkyRescue Charlie",
-    "batteryLevel": 100,
-    "lastLatitude": -23.5505,
-    "lastLongitude": -46.6333
-  }'
-```
-
-Registrar uma vitima em uma missao existente:
-
-```bash
-curl -X POST http://localhost:8080/api/v1/missions/1/victims \
-  -H "Content-Type: application/json" \
-  -d '{
-    "identification": "Victim-001",
-    "condition": "INJURED",
-    "latitude": -23.481,
-    "longitude": -45.921,
-    "detectionConfidence": 0.92
-  }'
-```
-
-
 ## Pipeline CI/CD
 
-O pipeline esta em `.github/workflows/ci-cd.yml` e usa GitHub Actions. Ele e
-disparado em pushes para `main`/`develop`, em pull requests e em tags
-`v*.*.*`. Possui quatro jobs encadeados:
+Ferramenta: **GitHub Actions** (arquivo `.github/workflows/ci-cd.yml`).
 
-- **build-and-test**: roda em todo push/PR. Faz checkout, configura o JDK 17
-  com cache do Maven, executa `./mvnw compile` e `./mvnw test`. Gera e
-  publica os relatorios do Surefire e o JAR como artefato.
-- **docker-build**: roda apos os testes passarem em pushes para `main`,
-  `develop` ou tags. Faz login no GitHub Container Registry (`ghcr.io`),
-  cria a imagem com cache de camadas e publica com tags derivadas do commit
-  (`sha`, nome da branch, semver e `latest`).
-- **deploy-staging**: roda em pushes para `main` ou `develop`, usando o
-  `environment: staging` do GitHub. Publica a imagem no host de staging e
-  faz um smoke test em `/actuator/health`.
-- **deploy-production**: roda em pushes para `main` ou tags `v*.*.*`,
-  usando o `environment: production` (pode exigir aprovacao manual). Faz o
-  deploy para producao e um smoke test.
+**Gatilhos:** push em `main` / `develop`, pull requests para essas branches,
+tags `v*.*.*`, e execucao manual (`workflow_dispatch`).
 
-Por padrao os jobs de deploy apenas imprimem os comandos que seriam
-executados (docker compose ou kubectl). Para um deploy real basta trocar
-por um step de SSH/kubectl com o kubeconfig do cluster como secret. O
-enunciado pede o fluxo funcional (que existe), e deixar o deploy
-parametrizavel evita vazar credenciais no repositorio.
+**Job `build-and-test` (build + testes):**
 
+1. Checkout do codigo e JDK 17 (Eclipse Temurin) com cache Maven.
+2. **Compilar:** `./mvnw clean compile`
+3. **Testes unitarios/integracao (H2, perfil `test`):** `./mvnw test -DexcludedGroups=bdd`
+4. **Testes BDD + contrato JSON (Cucumber, H2):** `./mvnw test "-Dtest=bdd.skyrescue.SkyRescueBddJUnitSuite,bdd.skyrescue.MissionResponseContractTest"`
+5. Publicacao dos relatorios Surefire e do JAR como artefatos.
 
-## Containerizacao
+**Job `docker-build`:** apos testes em push para `main`/`develop` ou tags;
+login no **GHCR**, build/push da imagem Docker com tags (sha, branch, semver,
+`latest` na branch padrao).
 
-A imagem da aplicacao e construida com um `Dockerfile` multi-stage:
+**Jobs `deploy-staging` e `deploy-production`:** usam `environment` do GitHub;
+por padrao exibem os comandos de deploy e um smoke test (`curl` no health).
+Substitua os `echo` por SSH/`kubectl`/`docker compose` reais quando houver
+secrets (kubeconfig, host, etc.).
 
-- Stage `build` usa `maven:3.9.9-eclipse-temurin-17` para compilar e extrair
-  as camadas do jar com o `spring-boot-jarmode-layertools`.
-- Stage `runtime` usa `eclipse-temurin:17-jre-alpine`, copia as camadas
-  (dependencies, spring-boot-loader, snapshot-dependencies, application)
-  separadamente para aproveitar o cache e roda como usuario nao-root
-  (`skyrescue`).
-- Tem um `HEALTHCHECK` que consulta `/actuator/health`.
+## Containerização
 
-Conteudo do `Dockerfile`:
+A imagem e **multi-stage**:
+
+- **Build:** `maven:3.9.9-eclipse-temurin-17` compila o projeto e extrai camadas
+  com `spring-boot-jarmode-layertools`.
+- **Runtime:** `eclipse-temurin:17-jre-alpine`, camadas copiadas separadamente
+  (cache de build), usuario **nao-root** (`skyrescue`), `HEALTHCHECK` em
+  `/actuator/health`.
+
+**Dockerfile (referencia):**
 
 ```Dockerfile
 # syntax=docker/dockerfile:1.6
@@ -204,21 +157,26 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
 ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS org.springframework.boot.loader.launch.JarLauncher"]
 ```
 
-A orquestracao e feita com `docker-compose.yml` (aplicacao + Postgres +
-pgAdmin opcional) e dois overrides: `docker-compose.staging.yml` e
-`docker-compose.prod.yml`, que ajustam portas, limites de CPU/memoria e o
-perfil ativo do Spring. Variaveis sensiveis sao lidas de `.env` (exemplo
-em `.env.example`). Ha volumes nomeados para o Postgres e pgAdmin e uma
-rede bridge dedicada (`skyrescue-net`) isolando os containers.
-
+**Orquestracao:** `docker-compose.yml` (app + Postgres + pgAdmin opcional) e
+overrides `docker-compose.staging.yml` e `docker-compose.prod.yml`. Variaveis
+em `.env` (modelo em `.env.example`); rede `skyrescue-net`.
 
 ## Prints do funcionamento
 
-As evidencias visuais ficam em `docs/prints/`. Os prints exigidos na entrega
-(pipeline rodando, docker compose ativo, Swagger, chamadas em staging e
-producao) estao listados em `docs/prints/README.md` e referenciados no
-documento tecnico (`docs/ENTREGA.pdf`).
+Coloque as **evidencias** (capturas de tela ou links publicos) em
+`docs/prints/`. Lista sugerida de arquivos: veja `docs/prints/README.md`.
 
+Inclua, conforme o enunciado da disciplina:
+
+- Pipeline rodando (**build**, **testes** — inclusive passo BDD se visivel —,
+  **deploy** / jobs de staging e producao).
+- **Docker Compose** ativo (`docker compose ps`, containers saudaveis).
+- **Swagger** ou chamadas HTTP locais.
+- **Staging** e **producao** (URLs configuradas no workflow, ex. health ou
+  Swagger), se aplicavel ao seu deploy.
+
+Opcional: anexar logs de CI ou de `docker compose logs` na pasta `docs/prints/`
+ou no PDF.
 
 ## Tecnologias utilizadas
 
@@ -226,28 +184,89 @@ documento tecnico (`docs/ENTREGA.pdf`).
   Actuator)
 - Hibernate 6 + Lombok
 - springdoc-openapi 2.6 (Swagger UI)
-- PostgreSQL 16 em staging/prod e H2 em dev/testes
-- JUnit 5, Mockito e MockMvc para testes
-- Apache Maven 3.9 via Maven Wrapper
-- Docker multi-stage com Spring Boot Layered Jar
-- Docker Compose v2 com overrides por ambiente
-- GitHub Actions + GitHub Container Registry
+- PostgreSQL 16 (Compose / staging / prod) e H2 (dev e testes)
+- JUnit 5, Mockito, MockMvc; **Cucumber** + **JUnit Platform** (BDD em
+  `skyrescue-bdd/`)
+- Apache Maven 3.9 (Maven Wrapper)
+- Docker multi-stage + Spring Boot layered JAR
+- Docker Compose v2 (overrides por ambiente)
+- GitHub Actions + GitHub Container Registry (GHCR)
 
+## Checklist de Entrega (obrigatório)
 
-## Checklist de entrega
+Preencha substituindo `☐` por `☑` (ou marque no PDF) antes de enviar.
 
 | Item                                                             | OK |
 | ---------------------------------------------------------------- | -- |
-| Projeto compactado em .ZIP com estrutura organizada              | OK |
-| Dockerfile funcional                                             | OK |
-| docker-compose.yml ou arquivos Kubernetes                        | OK (docker-compose) |
-| Pipeline com etapas de build, teste e deploy                     | OK |
-| README.md com instrucoes e prints                                | OK |
-| Documentacao tecnica com evidencias (PDF ou PPT)                 | OK (`docs/ENTREGA.pdf`) |
-| Deploy realizado nos ambientes staging e producao                | OK |
+| Projeto compactado em .ZIP com estrutura organizada              | ☐ |
+| Dockerfile funcional                                             | ☐ |
+| docker-compose.yml ou arquivos Kubernetes                        | ☐ |
+| Pipeline com etapas de build, teste e deploy                     | ☐ |
+| README.md com instrucoes e prints                                | ☐ |
+| Documentacao tecnica com evidencias (PDF ou PPT)                | ☐ |
+| Deploy realizado nos ambientes staging e producao                | ☐ |
 
+**Documentacao em PDF ou PPT:** exporte `docs/ENTREGA.md` (por exemplo com
+Pandoc ou extensao "Markdown PDF" no VS Code) para **`docs/ENTREGA.pdf`** ou
+entregue o `.pptx` equivalente, com os topicos pedidos no enunciado.
+
+---
+
+## Detalhes da API SkyRescue
+
+| Metodo | Rota                                     | Descricao                         |
+| ------ | ---------------------------------------- | --------------------------------- |
+| GET    | `/api/v1/status`                         | Status e ambiente atual           |
+| GET    | `/actuator/health`                       | Health check                      |
+| GET    | `/actuator/prometheus`                   | Metricas Prometheus               |
+| GET    | `/api/v1/drones`                         | Lista drones                      |
+| POST   | `/api/v1/drones`                         | Cadastra drone                    |
+| PUT    | `/api/v1/drones/{id}`                    | Atualiza drone                    |
+| DELETE | `/api/v1/drones/{id}`                    | Remove drone                      |
+| GET    | `/api/v1/missions`                       | Lista missoes                     |
+| POST   | `/api/v1/missions`                       | Cria missao (com drone opcional)  |
+| PATCH  | `/api/v1/missions/{id}/status?status=..` | Atualiza status da missao         |
+| GET    | `/api/v1/missions/{id}/victims`          | Vitimas detectadas na missao      |
+| POST   | `/api/v1/missions/{id}/victims`          | Registra nova deteccao            |
+
+Exemplo — cadastrar drone:
+
+```bash
+curl -X POST http://localhost:8080/api/v1/drones \
+  -H "Content-Type: application/json" \
+  -d '{
+    "serialNumber": "SR-CHARLIE-003",
+    "model": "SkyRescue Charlie",
+    "batteryLevel": 100,
+    "lastLatitude": -23.5505,
+    "lastLongitude": -46.6333
+  }'
+```
+
+Registrar vitima:
+
+```bash
+curl -X POST http://localhost:8080/api/v1/missions/1/victims \
+  -H "Content-Type: application/json" \
+  -d '{
+    "identification": "Victim-001",
+    "condition": "INJURED",
+    "latitude": -23.481,
+    "longitude": -45.921,
+    "detectionConfidence": 0.92
+  }'
+```
+
+## Testes BDD (Cucumber) e contrato de missao
+
+Cenarios Gherkin, JSON Schema e steps em **`skyrescue-bdd/`**; glue Java em
+`bdd.skyrescue`.
+
+```bash
+./mvnw test
+./mvnw test "-Dtest=bdd.skyrescue.SkyRescueBddJUnitSuite,bdd.skyrescue.MissionResponseContractTest"
+```
 
 ## Integrantes
 
-- Tiago Tiradentes Cuzzuol Nunes - RM 560754
-
+- Tiago Tiradentes Cuzzuol Nunes — RM 560754

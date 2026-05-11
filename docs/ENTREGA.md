@@ -1,28 +1,32 @@
-# Documentacao Tecnica - SkyRescue
+# Documentacao Tecnica - Cidades ESG Inteligentes (SkyRescue)
 
-Documento de entrega da fase "Navegando pelo mundo DevOps". Pode ser
-exportado para PDF abrindo este arquivo no VS Code com a extensao
-"Markdown PDF" ou rodando `pandoc docs/ENTREGA.md -o entrega.pdf`.
+Documento de entrega da fase "Navegando pelo mundo DevOps".
+
+**Exportar para PDF ou PPT:** abra este arquivo no VS Code (extensao "Markdown
+PDF") ou use Pandoc, por exemplo:
+
+```bash
+pandoc docs/ENTREGA.md -o docs/ENTREGA.pdf
+```
+
+O arquivo gerado **`docs/ENTREGA.pdf`** (ou `.pptx`) deve ser incluido no ZIP da
+entrega, com os topicos abaixo e o **checklist obrigatorio** no final.
 
 
-## Titulo do projeto
+## Titulo do projeto e integrantes
 
-**SkyRescue - Sistema de Resgate por Drones**
-
-Startup que opera uma frota de drones autonomos capazes de encontrar
-vitimas em situacoes de desastre (enchentes, terremotos, deslizamentos,
-incendios, desabamentos). A ideia e reduzir o tempo entre a ocorrencia do
-desastre e o primeiro contato com a vitima, aumentando as chances de
-sobrevivencia.
-
-### Integrantes
+**SkyRescue — Sistema de Resgate por Drones** (Cidades ESG Inteligentes)
 
 | Nome                            | RM         |
 | ------------------------------- | ---------- |
 | Tiago Tiradentes Cuzzuol Nunes  | RM 560754  |
 
+A startup simula operacao de drones autonomos para localizar vitimas em
+desastres (enchentes, terremotos, deslizamentos, incendios, desabamentos),
+com API para drones, missoes e registro de vitimas.
 
-## Descricao do pipeline CI/CD
+
+## Descricao do pipeline (ferramenta, etapas e logica)
 
 Usamos o **GitHub Actions** (`.github/workflows/ci-cd.yml`). A escolha foi
 pela integracao direta com o repositorio no GitHub, por ser gratuito para
@@ -33,8 +37,10 @@ O workflow tem quatro jobs encadeados:
 
 1. `build-and-test` - roda em todo push e pull request. Faz checkout,
    configura JDK 17 (Temurin) com cache do Maven, executa
-   `./mvnw clean compile` e depois `./mvnw test`. Publica o relatorio do
-   Surefire e o JAR empacotado como artefatos do workflow.
+   `./mvnw clean compile`, depois `./mvnw test -DexcludedGroups=bdd` (testes
+   unitarios/integracao com **H2**), em seguida o passo dedicado de
+   **testes BDD** (Cucumber + contrato JSON, tambem com H2), publica o
+   relatorio Surefire e empacota o JAR como artefato.
 2. `docker-build` - roda apos os testes passarem em pushes para
    `main`/`develop` ou em tags `v*.*.*`. Faz login no GHCR, gera tags com o
    `docker/metadata-action` (sha curto, branch, semver e `latest` para o
@@ -46,8 +52,6 @@ O workflow tem quatro jobs encadeados:
    sempre depois que o staging passou. Usa o `environment: production`,
    que pode exigir aprovacao manual.
 
-A tabela abaixo resume quais jobs rodam em cada gatilho:
-
 | Gatilho                       | build-and-test | docker-build | deploy-staging | deploy-production |
 | ----------------------------- | :------------: | :----------: | :------------: | :---------------: |
 | Pull request para main/dev    |      sim       |      -       |       -        |         -         |
@@ -58,11 +62,11 @@ A tabela abaixo resume quais jobs rodam em cada gatilho:
 
 Para o deploy real basta adicionar um secret com o kubeconfig do cluster
 (ou credenciais SSH do host) e substituir os `echo` dos steps de deploy
-por um step de `kubectl` ou `docker compose`. Decidimos deixar
-parametrizavel para nao vazar credenciais no repositorio.
+por um step de `kubectl` ou `docker compose`. Os steps atuais imprimem os
+comandos para nao vazar credenciais no repositorio.
 
 
-## Docker
+## Docker (arquitetura, comandos, imagem)
 
 ### Arquitetura da imagem
 
@@ -107,26 +111,21 @@ A orquestracao usa Docker Compose:
   maiores de CPU/memoria, `SPRING_PROFILES_ACTIVE=prod`).
 
 
-## Prints do pipeline e dos ambientes
+## Prints do pipeline e dos ambientes (evidencias no PDF)
 
-As capturas ficam em `docs/prints/`. Os arquivos sugeridos sao:
+Inclua no PDF as capturas correspondentes aos itens do enunciado:
 
-- `01-pipeline-build.png` - job `build-and-test` com os 9 testes verdes.
-- `02-pipeline-docker.png` - imagem publicada no GHCR (job `docker-build`).
-- `03-pipeline-staging.png` - deploy de staging concluido e smoke test OK.
-- `04-pipeline-production.png` - deploy de producao concluido.
-- `05-docker-compose-up.png` - `docker compose ps` com containers saudaveis.
-- `06-curl-drones.png` - chamada `GET /api/v1/drones` retornando o seed.
-- `07-swagger-ui.png` - Swagger UI com os endpoints.
-- `08-actuator-health.png` - `/actuator/health` respondendo `UP`.
-- `10-staging-swagger.png` - Swagger UI em `staging.skyrescue.io`.
-- `11-staging-api-call.png` - chamada real ao ambiente de staging.
-- `12-production-swagger.png` - Swagger UI em `api.skyrescue.io`.
-- `13-production-api-call.png` - chamada real em producao.
+- Pipeline com **build**, **testes** (e passo BDD, se disponivel) e **deploy**.
+- Ambientes **staging** e **producao** em funcionamento (health, Swagger ou
+  chamada HTTP).
 
-Como os prints dependem do repositorio estar publicado e do pipeline estar
-rodando com os secrets configurados, as capturas sao adicionadas depois do
-push inicial.
+Os arquivos de imagem podem ficar em `docs/prints/` (veja `docs/prints/README.md`).
+Sugestao de nomes:
+
+- `github-pipeline.png` — visao geral do workflow verde.
+- `docker-containers.png` — `docker compose ps` com containers saudaveis.
+- `staging-health-or-swagger.png` / `production-health-or-swagger.png` —
+  evidencias de staging e producao.
 
 
 ## Desafios encontrados e como resolvemos
@@ -154,23 +153,21 @@ push inicial.
    e trocar o step de `echo` por `kubectl set image` ou
    `docker compose up -d`.
 
-5. **Cobertura de testes minima pedida no enunciado**. Escrevemos 9 testes
-   automatizados:
-   - `SkyRescueApplicationTests` (sobe o contexto do Spring),
-   - `DroneServiceTest` com quatro casos mockando o repositorio,
-   - `MissionServiceTest` cobrindo criacao com e sem drone, alocacao de
-     drone indisponivel e liberacao do drone na conclusao da missao,
-   - `DroneControllerIT` com tres testes de ponta-a-ponta via MockMvc.
+5. **Testes automatizados e BDD**. Alem dos testes de servico e contexto
+   Spring, adicionamos a suite **Cucumber** em `skyrescue-bdd/` e um teste de
+   **contrato JSON** para a resposta de missao, executados na CI com H2.
 
 
-## Checklist de entrega
+## Checklist de Entrega (obrigatório — preencher no PDF)
+
+Substitua `☐` por `☑` ao concluir cada item antes de enviar o ZIP e o PDF.
 
 | Item                                                             | OK |
 | ---------------------------------------------------------------- | -- |
-| Projeto compactado em .ZIP com estrutura organizada              | OK |
-| Dockerfile funcional                                             | OK |
-| docker-compose.yml ou arquivos Kubernetes                        | OK (docker-compose) |
-| Pipeline com etapas de build, teste e deploy                     | OK |
-| README.md com instrucoes e prints                                | OK |
-| Documentacao tecnica com evidencias (PDF ou PPT)                 | OK (este arquivo) |
-| Deploy realizado nos ambientes staging e producao                | OK |
+| Projeto compactado em .ZIP com estrutura organizada              | ☐ |
+| Dockerfile funcional                                             | ☐ |
+| docker-compose.yml ou arquivos Kubernetes                        | ☐ |
+| Pipeline com etapas de build, teste e deploy                     | ☐ |
+| README.md com instrucoes e prints                                | ☐ |
+| Documentacao tecnica com evidencias (PDF ou PPT)                 | ☐ |
+| Deploy realizado nos ambientes staging e producao                | ☐ |
