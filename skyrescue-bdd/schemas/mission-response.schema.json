@@ -1,0 +1,81 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://skyrescue.local/schemas/mission-response.json",
+  "title": "SkyRescue Mission API response",
+  "description": "Contract for GET/POST/PATCH mission responses under /api/v1/missions",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "title",
+    "disasterType",
+    "status",
+    "latitude",
+    "longitude",
+    "startedAt",
+    "victimsCount"
+  ],
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 150
+    },
+    "description": {
+      "type": ["string", "null"],
+      "maxLength": 500
+    },
+    "disasterType": {
+      "type": "string",
+      "enum": [
+        "EARTHQUAKE",
+        "FLOOD",
+        "LANDSLIDE",
+        "WILDFIRE",
+        "HURRICANE",
+        "TSUNAMI",
+        "BUILDING_COLLAPSE",
+        "OTHER"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["PLANNED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "FAILED"]
+    },
+    "latitude": {
+      "type": "number",
+      "minimum": -90,
+      "maximum": 90
+    },
+    "longitude": {
+      "type": "number",
+      "minimum": -180,
+      "maximum": 180
+    },
+    "startedAt": {
+      "type": "string",
+      "minLength": 10,
+      "description": "ISO-8601 local date-time as returned by Jackson (API contract)"
+    },
+    "finishedAt": {
+      "anyOf": [
+        { "type": "null" },
+        { "type": "string", "minLength": 10 }
+      ]
+    },
+    "droneId": {
+      "anyOf": [
+        { "type": "null" },
+        { "type": "integer", "minimum": 1 }
+      ]
+    },
+    "victimsCount": {
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}

@@ -1,0 +1,79 @@
+name: skyrescue
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: skyrescue-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-skyrescue}
+      POSTGRES_USER: ${POSTGRES_USER:-skyrescue}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-skyrescue}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - skyrescue-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-skyrescue} -d ${POSTGRES_DB:-skyrescue}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: skyrescue/skyrescue-api:${APP_VERSION:-latest}
+    container_name: skyrescue-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-staging}
+      APP_ENVIRONMENT: ${APP_ENVIRONMENT:-staging}
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-skyrescue}
+      DB_USERNAME: ${POSTGRES_USER:-skyrescue}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-skyrescue}
+      SERVER_PORT: 8080
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    networks:
+      - skyrescue-net
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+
+  pgadmin:
+    image: dpage/pgadmin4:8
+    container_name: skyrescue-pgadmin
+    restart: unless-stopped
+    profiles: ["tools"]
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@skyrescue.io}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    depends_on:
+      - postgres
+    networks:
+      - skyrescue-net
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+
+volumes:
+  postgres-data:
+    driver: local
+  pgadmin-data:
+    driver: local
+
+networks:
+  skyrescue-net:
+    driver: bridge

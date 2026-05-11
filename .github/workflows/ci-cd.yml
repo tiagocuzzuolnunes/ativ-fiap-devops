@@ -1,0 +1,146 @@
+name: SkyRescue CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+    tags: ["v*.*.*"]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+env:
+  JAVA_VERSION: "17"
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+
+      - name: Compilar
+        run: ./mvnw -B -ntp clean compile
+
+      - name: Testes (unitarios e integracao, H2)
+        env:
+          SPRING_PROFILES_ACTIVE: test
+        run: ./mvnw -B -ntp test -DexcludedGroups=bdd
+
+      - name: Testes BDD (Cucumber + contrato JSON, H2)
+        env:
+          SPRING_PROFILES_ACTIVE: test
+        run: ./mvnw -B -ntp test "-Dtest=bdd.skyrescue.SkyRescueBddJUnitSuite,bdd.skyrescue.MissionResponseContractTest"
+
+      - name: Relatorio dos testes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: target/surefire-reports/
+          retention-days: 7
+
+      - name: Empacotar JAR
+        run: ./mvnw -B -ntp package -DskipTests
+
+      - name: Upload do JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: skyrescue-jar
+          path: target/skyrescue-api.jar
+          retention-days: 7
+
+  docker-build:
+    name: Build & Push Docker image
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.push.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login no GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tags e labels
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=,suffix=,format=short
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build e push
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-staging:
+    name: Deploy em Staging
+    needs: docker-build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
+    environment:
+      name: staging
+      url: https://staging.skyrescue.io
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy em staging
+        run: |
+          echo "Imagem: ${{ needs.docker-build.outputs.image-tag }}"
+          echo "docker compose -f docker-compose.yml -f docker-compose.staging.yml pull"
+          echo "docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d"
+
+      - name: Smoke test em staging
+        run: |
+          echo "curl -fsS https://staging.skyrescue.io/actuator/health"
+
+  deploy-production:
+    name: Deploy em Producao
+    needs: [docker-build, deploy-staging]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      url: https://api.skyrescue.io
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy em producao
+        run: |
+          echo "Imagem: ${{ needs.docker-build.outputs.image-tag }}"
+          echo "docker compose -f docker-compose.yml -f docker-compose.prod.yml pull"
+          echo "docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d"
+
+      - name: Smoke test em producao
+        run: |
+          echo "curl -fsS https://api.skyrescue.io/actuator/health"

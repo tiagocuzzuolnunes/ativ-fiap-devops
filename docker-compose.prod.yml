@@ -1,0 +1,22 @@
+services:
+  app:
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      APP_ENVIRONMENT: production
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
+    ports:
+      - "80:8080"
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1024M
+      restart_policy:
+        condition: on-failure
+        max_attempts: 5
+  postgres:
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1024M

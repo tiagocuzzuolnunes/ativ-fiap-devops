@@ -1,0 +1,13 @@
+target/
+!target/*.jar
+.git/
+.idea/
+.vscode/
+*.iml
+.DS_Store
+README.md
+docs/
+kubernetes/
+.github/
+*.log
+node_modules/

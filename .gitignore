@@ -1,0 +1,15 @@
+target/
+*.log
+.idea/
+.vscode/
+*.iml
+.DS_Store
+.env
+.env.local
+*.class
+HELP.md
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+build/
+out/

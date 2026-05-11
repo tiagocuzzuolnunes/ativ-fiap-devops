@@ -1,0 +1,13 @@
+services:
+  app:
+    environment:
+      SPRING_PROFILES_ACTIVE: staging
+      APP_ENVIRONMENT: staging
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=50.0"
+    ports:
+      - "8080:8080"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
